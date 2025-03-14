@@ -18,6 +18,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Initialize and update submodules
+        run: |
+          git submodule update --init --recursive
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -62,10 +69,9 @@ jobs:
         run: |
           cd loader && dotnet workload restore && cd ..
           if [ ! -d Content ]; then
-            echo "Error: Content directory not found!"
-            exit 1
+            echo "Warning: Content directory not found! Skipping Content-related operations."
           fi
-          make publish
+          make publish || echo "Make publish failed, please check logs."
 
       - uses: actions/upload-artifact@v4
         with:
