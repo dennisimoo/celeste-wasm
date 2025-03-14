@@ -1,0 +1,56 @@
+name: Build Celeste-WASM
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Celeste Loader
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        submodules: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y dotnet-host dotnet-runtime dotnet-sdk dotnet-targeting-pack aspnet-runtime fmodstudio xxd wget
+          wget https://github.com/emscripten-core/emsdk/archive/main.zip -O emsdk.zip
+          unzip emsdk.zip
+          mv emsdk-main emsdk
+          ./emsdk/emsdk install latest
+          ./emsdk/emsdk activate latest
+
+      - name: Setup environment
+        run: |
+          echo "EMSDK_PATH=$(pwd)/emsdk" >> $GITHUB_ENV
+          echo "DOTNET_ROOT=$(pwd)/.dotnet" >> $GITHUB_ENV
+          echo "PATH=$EMSDK_PATH:$DOTNET_ROOT:$PATH" >> $GITHUB_ENV
+
+      - name: Restore .NET workload
+        run: sudo dotnet workload restore
+
+      - name: Apply patches
+        run: |
+          git clone --depth 1 https://github.com/FNA-XNA/FNA.git ../FNA
+          patch -p1 < FNA.patch
+          ./patch.sh apply
+
+      - name: Build the project
+        run: make statics serve
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: celeste-wasm-build
+          path: build/
+          compression-level: 6
