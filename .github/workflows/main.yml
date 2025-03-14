@@ -1,6 +1,6 @@
-name: Build Celeste-WASM
+name: Build
 
-on:
+on: 
   workflow_dispatch:
   push:
     branches:
@@ -16,43 +16,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          submodules: true
-          fetch-depth: 1
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y dotnet-host dotnet-runtime dotnet-sdk dotnet-targeting-pack aspnet-runtime fmodstudio xxd wget
-          wget https://github.com/emscripten-core/emsdk/archive/main.zip -O emsdk.zip
-          unzip emsdk.zip
-          mv emsdk-main emsdk
-          ./emsdk/emsdk install latest
-          ./emsdk/emsdk activate latest
+        run: pnpm install
 
-      - name: Setup environment
-        run: |
-          echo "EMSDK_PATH=$(pwd)/emsdk" >> $GITHUB_ENV
-          echo "DOTNET_ROOT=$(pwd)/.dotnet" >> $GITHUB_ENV
-          echo "PATH=$EMSDK_PATH:$DOTNET_ROOT:$PATH" >> $GITHUB_ENV
-
-      - name: Restore .NET workload
-        run: sudo dotnet workload restore
-
-      - name: Apply patches
-        run: |
-          git clone --depth 1 https://github.com/FNA-XNA/FNA.git ../FNA
-          patch -p1 < FNA.patch
-          ./patch.sh apply
-
-      - name: Build the project
-        run: make statics serve
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Setup Dotnet 
+        uses: actions/setup-dotnet@v4
         with:
-          name: celeste-wasm-build
-          path: build/
+          dotnet-version: '9.0.102'
+
+      - name: Install mono
+        run: sudo apt-get install mono-devel
+
+      - name: Build Csproj
+        run: |
+          cd loader && dotnet workload restore && cd ..
+          make publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webleste-loader
+          path: frontend/dist/
           compression-level: 6
